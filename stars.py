@@ -17,7 +17,7 @@ import numpy as np
 def buildAperature(wcs, skyCoord) :
     starX, starY = skycoord_to_pixel(skyCoord, wcs)
     ap_pos = [(starX, starY)]
-    return [CircularAperture(ap_pos, r =10.), CircularAnnulus(ap_pos, r_in = 15, r_out = 25)]
+    return [CircularAperture(ap_pos, r =3.), CircularAnnulus(ap_pos, r_in = 6, r_out = 8)]
 
 def plotSky(filename, skyCoords) :
     hdu = fits.open(filename)[0]
@@ -52,7 +52,7 @@ def getStarData(filename, skyCoords) :
         aperatures = buildAperature(wcs, skyCoord)
         phot_table = aperture_photometry(hdu.data, aperatures)
         # Calculate the instrumental magnitude
-        instMag.append(-2.5 * np.log(phot_table[0][3]/aperatures[0].area() - phot_table[0][4]/aperatures[1].area()))
+        instMag.append(-2.5 * np.log(phot_table[0][3] - aperatures[0].area() * phot_table[0][4]/aperatures[1].area()))
 
     return jd, instMag
 
@@ -72,21 +72,28 @@ def plotDir(directory, skyCoord, plotFirst = False) :
         else:
             continue
 
-    return vartim, vardata
+    return np.array(vartim), np.array(vardata)
 
 dy_peg = SkyCoord(90.7142 * u.degree,-39.154 * u.degree, Galactic)
 GSC_01712_00542 = SkyCoord(90.6931 * u.degree,-39.1854 * u.degree, Galactic)
-stars = [dy_peg, GSC_01712_00542]
+HD_218587 = SkyCoord(90.7271 * u.degree,-39.2479 * u.degree, Galactic)
+GSC_01712_01246 = SkyCoord(90.6167 * u.degree,-39.2009 * u.degree, Galactic)
+stars = [dy_peg, GSC_01712_00542, HD_218587, GSC_01712_01246]
 vtime, vamp = plotDir('dy-peg/20150910-pt/V/', stars, plotFirst = True)
 btime, bamp =  plotDir('dy-peg/20150910-pt/B/', stars)
-vtime = np.array(vtime)
-btime = np.array(btime)
 vtime -= min(vtime)
 btime -= min(btime)
 
+
+knownMagB = np.array([[0,12.5,10.42,13] for x in range(len(bamp))])
+knownMagV = np.array([[0,11.7,9.91,11.1] for x in range(len(vamp))])
+
+offsetB = bamp - knownMagB
+offsetV = vamp - knownMagV
+
 fig = plt.figure()
-plt.plot(vtime, vamp, 'x', label = 'V')
-plt.plot(btime,bamp, 'x', label = 'B')
+plt.plot(vtime, vamp - np.tile(offsetV[:,2],(len(stars),1)).transpose(), 'x', label = 'V')
+plt.plot(btime,bamp - np.tile(offsetB[:,2],(len(stars),1)).transpose(), 'x', label = 'B')
 plt.legend()
 plt.ylabel('Amplitude')
 plt.xlabel('Time (Days)')

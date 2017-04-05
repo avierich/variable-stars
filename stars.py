@@ -52,7 +52,7 @@ def getStarData(filename, skyCoords) :
         aperatures = buildAperature(wcs, skyCoord)
         phot_table = aperture_photometry(hdu.data, aperatures)
         # Calculate the instrumental magnitude
-        instMag.append(-2.5 * np.log(phot_table[0][3] - aperatures[0].area() * phot_table[0][4]/aperatures[1].area()))
+        instMag.append(-2.5 * np.log10(phot_table[0][3] - aperatures[0].area() * phot_table[0][4]/aperatures[1].area()))
 
     return jd, instMag
 
@@ -88,12 +88,12 @@ btime -= min(btime)
 knownMagB = np.array([[0,12.5,10.42,13] for x in range(len(bamp))])
 knownMagV = np.array([[0,11.7,9.91,11.1] for x in range(len(vamp))])
 
-offsetB = bamp - knownMagB
-offsetV = vamp - knownMagV
+offsetB = - bamp + knownMagB
+offsetV =  -vamp + knownMagV
 
 fig = plt.figure()
-plt.plot(vtime, vamp - np.tile(offsetV[:,2],(len(stars),1)).transpose(), 'x', label = 'V')
-plt.plot(btime,bamp - np.tile(offsetB[:,2],(len(stars),1)).transpose(), 'x', label = 'B')
+plt.plot(vtime, vamp + np.tile(offsetV[:,2],(len(stars),1)).transpose(), 'x', label = 'V')
+plt.plot(btime,bamp + np.tile(offsetB[:,2],(len(stars),1)).transpose(), 'x', label = 'B')
 plt.legend()
 plt.ylabel('Amplitude')
 plt.xlabel('Time (Days)')

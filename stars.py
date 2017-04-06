@@ -50,9 +50,16 @@ def getStarData(filename, skyCoords) :
     instMag = []
     for skyCoord in skyCoords :
         aperatures = buildAperature(wcs, skyCoord)
-        phot_table = aperture_photometry(hdu.data, aperatures)
+        phot_table = aperture_photometry(hdu.data, aperatures, error=15*2.2)
+
         # Calculate the instrumental magnitude
-        instMag.append(-2.5 * np.log10(phot_table[0][3] - aperatures[0].area() * phot_table[0][4]/aperatures[1].area()))
+        S = phot_table[0][3]
+        errS = phot_table[0][4] 
+        B = phot_table[0][5]
+        errB = phot_table[0][6]
+        areas = aperatures[0].area()/aperatures[1].area()
+        instMag.append([-2.5*np.log10(S - areas*B),
+                        (2.5*errS/(areas*B - S))**2 + (2.5*areas*errB/(S - areas*B))**2])
 
     return jd, instMag
 
@@ -61,7 +68,7 @@ def plotDir(directory, skyCoord, plotFirst = False) :
     vartim = []
     for filename in os.listdir(directory):
         if filename.endswith(".fit"): 
-#            print('Reading : ' + filename)
+            print('Reading : ' + filename)
             if plotFirst :
                 plotFirst = False
                 plotSky(directory + filename, skyCoord)
@@ -74,6 +81,23 @@ def plotDir(directory, skyCoord, plotFirst = False) :
 
     return np.array(vartim), np.array(vardata)
 
+def getOffset(starData, knownMag) :
+    offsets = []
+    for frame in starData :
+        starOffset = []
+        for i in range(len(knownMag)) :
+            starOffset.append(knownMag[i] - frame[i])
+        offsets.append(starOffset)
+
+    offsets = np.array(offsets)
+    avgOffset = []
+    for frame in offsets :
+        avgOffset.append([frame.mean(),frame.std()])
+
+    return np.array(avgOffset)
+
+
+
 dy_peg = SkyCoord(90.7142 * u.degree,-39.154 * u.degree, Galactic)
 GSC_01712_00542 = SkyCoord(90.6931 * u.degree,-39.1854 * u.degree, Galactic)
 HD_218587 = SkyCoord(90.7271 * u.degree,-39.2479 * u.degree, Galactic)
@@ -85,15 +109,15 @@ vtime -= min(vtime)
 btime -= min(btime)
 
 
-knownMagB = np.array([[0,12.5,10.42,13] for x in range(len(bamp))])
-knownMagV = np.array([[0,11.7,9.91,11.1] for x in range(len(vamp))])
+offsetB = getOffset(bamp[:,1:,0], [12.5,10.42,13])
+offsetV = getOffset(vamp[:,1:,0], [11.7,9.91,11.1])
 
-offsetB = - bamp + knownMagB
-offsetV =  -vamp + knownMagV
+errV = offsetV[:,1]
+errB = offsetB[:,1]
 
 fig = plt.figure()
-plt.plot(vtime, vamp + np.tile(offsetV[:,2],(len(stars),1)).transpose(), 'x', label = 'V')
-plt.plot(btime,bamp + np.tile(offsetB[:,2],(len(stars),1)).transpose(), 'x', label = 'B')
+plt.errorbar(vtime, vamp[:,0,0] + offsetV[:,0],marker = 'o', xerr = None, yerr = errV,  label = 'V',fmt = 'none')
+plt.errorbar(btime,bamp[:,0,0] + offsetB[:,0],marker = 'o', xerr = None, yerr =  errB,  label = 'B',fmt = 'none')
 plt.legend()
 plt.ylabel('Amplitude')
 plt.xlabel('Time (Days)')
